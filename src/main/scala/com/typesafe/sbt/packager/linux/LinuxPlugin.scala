@@ -3,11 +3,11 @@ package packager
 package linux
 
 import sbt._
-import sbt.Keys.{ name, normalizedName, mappings, sourceDirectory }
+import sbt.Keys.{ name, normalizedName, mappings, sourceDirectory, doc }
 import linux.LinuxPlugin.Users
 import packager.Keys._
 import packager.archetypes.{ ServerLoader, TemplateWriter }
-import SbtNativePackager.Universal
+import SbtNativePackager.{ Universal, UniversalDocs }
 
 /**
  * Plugin containing all the generic values used for
@@ -21,10 +21,12 @@ import SbtNativePackager.Universal
 object LinuxPlugin extends AutoPlugin {
 
   override def requires = universal.UniversalPlugin
-  override lazy val projectSettings = linuxSettings ++ mapGenericFilesToLinux
+  override lazy val projectSettings = linuxSettings ++ linuxDocsSettings ++ mapGenericFilesToLinux
 
   object autoImport extends LinuxKeys with LinuxMappingDSL {
     val Linux = config("linux")
+    val LinuxDocs = config("linux-docs")
+    val LinuxSrc = config("linux-src")
   }
 
   import autoImport._
@@ -95,6 +97,19 @@ object LinuxPlugin extends AutoPlugin {
   )
 
   /**
+   * default linux documentation package settings
+   */
+  def linuxDocsSettings: Seq[Setting[_]] = Seq(
+    linuxPackageMappings in LinuxDocs := Seq.empty,
+    linuxPackageSymlinks in LinuxDocs := Seq.empty,
+    name in LinuxDocs := (name in Linux).value + "-doc",
+    packageSummary in LinuxDocs <<= packageSummary in Linux,
+    packageDescription in LinuxDocs <<= packageDescription in Linux,
+    packageName in LinuxDocs := (packageName in Linux).value + "-doc",
+    defaultLinuxDocLocation := "/usr/share/doc"
+  )
+
+  /**
    * maps the `mappings` content into `linuxPackageMappings` and
    * `linuxPackageSymlinks`.
    */
@@ -137,7 +152,15 @@ object LinuxPlugin extends AutoPlugin {
           destination = installLocation + "/" + pkg + "/conf"
         ))
         else Seq.empty
-      }
+      },
+    // Map doc files
+    linuxPackageMappings in LinuxDocs <++= (packageName in Linux, mappings in UniversalDocs, defaultLinuxDocLocation) map {
+      (pkg, mappings, docsLocation) =>
+        mappings map {
+          case (f, p) =>
+            packageMapping((f, docsLocation + "/" + pkg + "/" + p)) withUser Users.Root withGroup Users.Root withPerms "0644" asDocs
+        }
+    }
   )
 
   /**
@@ -165,8 +188,7 @@ object LinuxPlugin extends AutoPlugin {
     retries: Int = 0,
     retryTimeout: Int = 60,
     termTimeout: Int = 60,
-    killTimeout: Int = 30
-  ): Seq[(String, String)] =
+    killTimeout: Int = 30): Seq[(String, String)] =
     Seq(
       "author" -> author,
       "descr" -> description,

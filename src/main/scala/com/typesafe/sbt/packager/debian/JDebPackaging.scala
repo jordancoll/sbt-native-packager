@@ -33,7 +33,7 @@ object JDebPackaging extends AutoPlugin with DebianPluginLike {
 
   override def requires = DebianPlugin
 
-  override lazy val projectSettings = inConfig(Debian)(jdebSettings)
+  override lazy val projectSettings = inConfig(Debian)(jdebSettings) ++ inConfig(DebianDocs)(jdebSettings)
 
   def jdebSettings = Seq(
 

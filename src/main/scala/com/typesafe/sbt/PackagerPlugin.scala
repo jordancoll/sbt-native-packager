@@ -49,7 +49,9 @@ object SbtNativePackager extends AutoPlugin {
 
   /* === OS Configurations === */
   val Linux = linux.LinuxPlugin.autoImport.Linux
+  val LinuxDocs = linux.LinuxPlugin.autoImport.LinuxDocs
   val Debian = debian.DebianPlugin.autoImport.Debian
+  val DebianDocs = debian.DebianPlugin.autoImport.DebianDocs
   val Rpm = rpm.RpmPlugin.autoImport.Rpm
   val Windows = windows.WindowsPlugin.autoImport.Windows
   val Docker = docker.DockerPlugin.autoImport.Docker

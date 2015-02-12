@@ -143,6 +143,9 @@ The Debian support grants the following commands:
   ``debian:gen-changes``
     Generates the ``.changes``, and therefore the ``.deb`` package for this project.
     
+  ``debian-docs:package-bin``
+    Generates a ``.deb`` package for the docs in this project. 
+    
     
 Customize
 ---------------

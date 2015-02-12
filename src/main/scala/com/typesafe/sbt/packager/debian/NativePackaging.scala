@@ -42,7 +42,7 @@ trait DebianNativePackaging extends DebianPluginLike {
    * Using the native installed dpkg-build tools to build the debian
    * package.
    */
-  private[debian] def debianNativeSettings: Seq[Setting[_]] = inConfig(Debian)(Seq(
+  private[debian] def debianNativeSettings: Seq[Setting[_]] = Seq(
     genChanges <<= (packageBin, target, debianChangelog, name, version, debianPackageMetadata) map {
       (pkg, tdir, changelog, name, version, data) =>
         changelog match {
@@ -92,7 +92,7 @@ trait DebianNativePackaging extends DebianPluginLike {
         }
         tdir / ".." / archive
     }
-  ))
+  )
 
 }
 

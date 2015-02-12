@@ -18,7 +18,7 @@ import linux.{ LinuxFileMetaData, LinuxPackageMapping, LinuxSymlink }
 import linux.LinuxPlugin.Users
 import universal.Archives
 import archetypes.TemplateWriter
-import SbtNativePackager.{ Universal, Linux }
+import SbtNativePackager.{ Universal, Linux, LinuxDocs }
 
 /**
  * == Debian Plugin ==
@@ -42,6 +42,7 @@ object DebianPlugin extends AutoPlugin with DebianNativePackaging {
 
   object autoImport extends DebianKeys {
     val Debian = config("debian") extend Linux
+    val DebianDocs = config("debian-docs") extend LinuxDocs
   }
 
   import autoImport._
@@ -80,42 +81,41 @@ object DebianPlugin extends AutoPlugin with DebianNativePackaging {
   /**
    * Enables native packaging by default
    */
-  override lazy val projectSettings = settings ++ inConfig(Debian)(debianSettings) ++ debianNativeSettings
+  override lazy val projectSettings = debianSettings(Debian) ++ debianSettings(DebianDocs) ++ binSettings ++ docsSettings ++
+    inConfig(Debian)(debianNativeSettings) ++ inConfig(DebianDocs)(debianNativeSettings)
 
   /**
    * the default debian settings for the debian namespaced settings
    */
-  private def settings = Seq(
-    /* ==== Debian default settings ==== */
-    debianPriority := "optional",
-    debianSection := "java",
-    debianPackageDependencies := Seq.empty,
-    debianPackageRecommends := Seq.empty,
-    debianSignRole := "builder",
-    target in Debian <<= (target, name in Debian, version in Debian) apply ((t, n, v) => t / (n + "-" + v)),
-    name in Debian <<= (name in Linux),
-    packageName in Debian <<= (packageName in Linux),
-    executableScriptName in Debian <<= (executableScriptName in Linux),
-    version in Debian <<= (version in Linux),
-    linuxPackageMappings in Debian <<= linuxPackageMappings,
-    packageDescription in Debian <<= packageDescription in Linux,
-    packageSummary in Debian <<= packageSummary in Linux,
-    maintainer in Debian <<= maintainer in Linux,
+  private def binSettings = inConfig(Debian)(
+    Seq(
+      /* ==== Debian default settings ==== */
+      debianSection := "java",
 
-    /* ==== Debian configuration settings ==== */
-    debianControlScriptsDirectory <<= (sourceDirectory) apply (_ / "debian" / Names.Debian),
-    debianMaintainerScripts := Seq.empty,
-    debianMakePreinstScript := defaultMaintainerScript(Names.Preinst, linuxScriptReplacements.value, (target in Universal).value),
-    debianMakePrermScript := defaultMaintainerScript(Names.Prerm, linuxScriptReplacements.value, (target in Universal).value),
-    debianMakePostinstScript := defaultMaintainerScript(Names.Postinst, linuxScriptReplacements.value, (target in Universal).value),
-    debianMakePostrmScript := defaultMaintainerScript(Names.Postrm, linuxScriptReplacements.value, (target in Universal).value),
-    debianChangelog := None,
+      /* ==== Debian configuration settings ==== */
+      debianControlScriptsDirectory <<= (sourceDirectory) apply (_ / "debian" / Names.Debian),
+      debianMaintainerScripts := Seq.empty,
+      debianMakePreinstScript := defaultMaintainerScript(Names.Preinst, linuxScriptReplacements.value, (target in Universal).value),
+      debianMakePrermScript := defaultMaintainerScript(Names.Prerm, linuxScriptReplacements.value, (target in Universal).value),
+      debianMakePostinstScript := defaultMaintainerScript(Names.Postinst, linuxScriptReplacements.value, (target in Universal).value),
+      debianMakePostrmScript := defaultMaintainerScript(Names.Postrm, linuxScriptReplacements.value, (target in Universal).value),
 
-    /* ==== Debian maintainer scripts ==== */
-    debianMaintainerScripts <++= (debianMakePrermScript, debianControlScriptsDirectory) map scriptMapping(Names.Prerm),
-    debianMaintainerScripts <++= (debianMakePreinstScript, debianControlScriptsDirectory) map scriptMapping(Names.Preinst),
-    debianMaintainerScripts <++= (debianMakePostinstScript, debianControlScriptsDirectory) map scriptMapping(Names.Postinst),
-    debianMaintainerScripts <++= (debianMakePostrmScript, debianControlScriptsDirectory) map scriptMapping(Names.Postrm)
+      /* ==== Debian maintainer scripts ==== */
+      debianMaintainerScripts <++= (debianMakePrermScript, debianControlScriptsDirectory) map scriptMapping(Names.Prerm),
+      debianMaintainerScripts <++= (debianMakePreinstScript, debianControlScriptsDirectory) map scriptMapping(Names.Preinst),
+      debianMaintainerScripts <++= (debianMakePostinstScript, debianControlScriptsDirectory) map scriptMapping(Names.Postinst),
+      debianMaintainerScripts <++= (debianMakePostrmScript, debianControlScriptsDirectory) map scriptMapping(Names.Postrm)
+    )
+  )
+
+  /**
+   * default debian docs settings
+   */
+  private def docsSettings = inConfig(DebianDocs)(
+    Seq(
+      debianSection := "doc",
+      debianMaintainerScripts := Seq.empty
+    )
   )
 
   /**
@@ -123,12 +123,29 @@ object DebianPlugin extends AutoPlugin with DebianNativePackaging {
    * Everything used inside the debian scope
    *
    */
-  private def debianSettings: Seq[Setting[_]] = inConfig(Debian)(
+  private def debianSettings(conf: Configuration): Seq[Setting[_]] = inConfig(conf)(
     Seq(
       packageArchitecture := "all",
       debianPackageInfo <<= (packageName, version, maintainer, packageSummary, packageDescription) apply PackageInfo,
-      debianPackageMetadata <<= (debianPackageInfo, debianPriority, packageArchitecture, debianSection,
-        debianPackageDependencies, debianPackageRecommends) apply PackageMetaData,
+      debianPriority := "optional",
+      debianSignRole := "builder",
+      debianPackageDependencies := Seq.empty,
+      debianPackageRecommends := Seq.empty,
+      debianPackageBreaks := Seq.empty,
+      debianPackageConflicts := Seq.empty,
+      debianPackageEnhances := Seq.empty,
+      debianPackagePreDepends := Seq.empty,
+      debianPackageProvides := Seq.empty,
+      debianPackageReplaces := Seq.empty,
+      debianPackageSuggests := Seq.empty,
+      target <<= (target, name, version) apply ((t, n, v) => t / (n + "-" + v)),
+      debianChangelog := None,
+      debianPackageMetadata <<= {
+        val relationships = (debianPackageDependencies, debianPackageRecommends, debianPackageSuggests, debianPackageEnhances,
+          debianPackagePreDepends, debianPackageBreaks, debianPackageConflicts, debianPackageProvides,
+          debianPackageReplaces) apply PackageRelationships
+        (debianPackageInfo, debianPriority, packageArchitecture, debianSection, relationships) apply PackageMetaData
+      },
       debianPackageInstallSize <<= linuxPackageMappings map { mappings =>
         (for {
           LinuxPackageMapping(files, _, zipped) <- mappings
@@ -180,9 +197,9 @@ object DebianPlugin extends AutoPlugin with DebianNativePackaging {
           md5file
       },
       debianMakeChownReplacements <<= (linuxPackageMappings, streams) map makeChownReplacements,
-      debianExplodedPackage <<= (linuxPackageMappings, debianControlFile, debianMaintainerScripts, debianConffilesFile, debianChangelog, daemonShell in Linux,
+      debianExplodedPackage <<= (linuxPackageMappings, debianControlFile, debianMaintainerScripts, debianConffilesFile, debianChangelog,
         linuxScriptReplacements, debianMakeChownReplacements, linuxPackageSymlinks, target, streams)
-        map { (mappings, _, maintScripts, _, changelog, shell, replacements, chown, symlinks, t, streams) =>
+        map { (mappings, _, maintScripts, _, changelog, replacements, chown, symlinks, t, streams) =>
 
           // Create files and directories
           mappings foreach {
@@ -219,7 +236,6 @@ object DebianPlugin extends AutoPlugin with DebianNativePackaging {
     // Adding package specific implementation settings
     )
   )
-
 }
 
 /**
@@ -352,5 +368,6 @@ object DebianDeployPlugin extends AutoPlugin {
 
   override def projectSettings =
     SettingsHelper.makeDeploymentSettings(Debian, packageBin in Debian, "deb") ++
-      SettingsHelper.makeDeploymentSettings(Debian, genChanges in Debian, "changes")
+      SettingsHelper.makeDeploymentSettings(Debian, genChanges in Debian, "changes") ++
+      SettingsHelper.makeDeploymentSettings(DebianDocs, packageBin in DebianDocs, "deb")
 }
